@@ -1,0 +1,1864 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intel 8086 Microprocessor Architecture — Interactive Schematic & Simulator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', ' system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            eu: {
+              DEFAULT: '#10b981',
+              glow: 'rgba(16, 185, 129, 0.35)'
+            },
+            biu: {
+              DEFAULT: '#3b82f6',
+              glow: 'rgba(59, 130, 246, 0.35)'
+            },
+            bus: {
+              DEFAULT: '#f59e0b',
+              glow: 'rgba(245, 158, 11, 0.4)'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Schematic & Animation Styles */
+    :root {
+      --bg-grid: rgba(148, 163, 184, 0.07);
+    }
+    html.light {
+      --bg-grid: rgba(15, 23, 42, 0.06);
+    }
+    .blueprint-grid {
+      background-size: 24px 24px;
+      background-image: 
+        linear-gradient(to right, var(--bg-grid) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--bg-grid) 1px, transparent 1px);
+    }
+
+    /* Interactive Block Hover & Active States */
+    .arch-block {
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer;
+      position: relative;
+    }
+    .arch-block:hover {
+      transform: translateY(-2px);
+    }
+    .arch-block.selected-eu {
+      box-shadow: 0 0 0 2px #10b981, 0 0 22px rgba(16, 185, 129, 0.35);
+    }
+    .arch-block.selected-biu {
+      box-shadow: 0 0 0 2px #3b82f6, 0 0 22px rgba(59, 130, 246, 0.35);
+    }
+    .arch-block.selected-shared {
+      box-shadow: 0 0 0 2px #f59e0b, 0 0 22px rgba(245, 158, 11, 0.4);
+    }
+
+    /* Animated Data Flow Pulse */
+    @keyframes pulseBus {
+      0%, 100% { filter: drop-shadow(0 0 2px currentColor); opacity: 0.85; }
+      50% { filter: drop-shadow(0 0 10px currentColor); opacity: 1; }
+    }
+    .bus-active {
+      animation: pulseBus 0.9s infinite ease-in-out;
+    }
+
+    @keyframes packetFlowDown {
+      0% { transform: translateY(-100%); opacity: 0; }
+      30% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { transform: translateY(100%); opacity: 0; }
+    }
+    @keyframes packetFlowUp {
+      0% { transform: translateY(100%); opacity: 0; }
+      30% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { transform: translateY(-100%); opacity: 0; }
+    }
+    .flow-down::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, transparent, #38bdf8, transparent);
+      animation: packetFlowDown 0.85s ease-in-out infinite;
+    }
+    .flow-up::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, transparent, #10b981, transparent);
+      animation: packetFlowUp 0.85s ease-in-out infinite;
+    }
+
+    /* ALU V-Shape Custom Clip */
+    .alu-polygon {
+      clip-path: polygon(0% 0%, 38% 0%, 50% 28%, 62% 0%, 100% 0%, 82% 100%, 18% 100%);
+    }
+    /* Adder Trapezoid Clip */
+    .adder-polygon {
+      clip-path: polygon(0% 0%, 40% 0%, 50% 22%, 60% 0%, 100% 0%, 84% 100%, 16% 100%);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.3);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.5);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased selection:bg-blue-500 selection:text-white min-h-screen blueprint-grid transition-colors duration-300">
+
+  <!-- TOP HEADER & QUICK SPEC BAR -->
+  <header class="sticky top-0 z-40 border-b border-slate-800/90 bg-slate-950/90 backdrop-blur-md">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-blue-500/20 font-mono font-bold text-white text-sm border border-white/20">
+          8086
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg sm:text-xl font-extrabold tracking-tight text-white">Intel 8086 Internal Architecture</h1>
+            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/30">
+              16-Bit HMOS Microprocessor (1978)
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Interactive EU &amp; BIU Block Diagram, Pipelined Instruction Queue, 20-Bit Physical Address Adder &amp; Flag Explorer</p>
+        </div>
+      </div>
+
+      <!-- Key Chip Specs Pill Strip -->
+      <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+        <div class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">
+          <span class="text-slate-500">Data Bus:</span> <span class="text-emerald-400 font-semibold">16-bit</span>
+        </div>
+        <div class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">
+          <span class="text-slate-500">Addr Bus:</span> <span class="text-blue-400 font-semibold">20-bit</span>
+        </div>
+        <div class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">
+          <span class="text-slate-500">Memory:</span> <span class="text-amber-400 font-semibold">2<sup>20</sup> = 1 MB</span>
+        </div>
+        <div class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hidden xl:block">
+          <span class="text-slate-500">Queue:</span> <span class="text-purple-400 font-semibold">6-Byte FIFO</span>
+        </div>
+
+        <!-- Navigation Jump Buttons -->
+        <div class="flex items-center gap-1 ml-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+          <a href="#schematic-section" class="px-2.5 py-1 rounded-md bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 font-sans font-medium transition">Diagram</a>
+          <a href="#address-calc-section" class="px-2.5 py-1 rounded-md hover:bg-slate-800 text-slate-300 font-sans font-medium transition">20-Bit Adder</a>
+          <a href="#flag-explorer-section" class="px-2.5 py-1 rounded-md hover:bg-slate-800 text-slate-300 font-sans font-medium transition">16-Bit Flags</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE CONTAINER -->
+  <main class="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-8">
+
+    <!-- PIPELINE SIMULATOR CONTROL BAR -->
+    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="flex items-start sm:items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 font-mono font-bold">
+            ⚡
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200">Pipelining &amp; Bus Cycle Simulator</h2>
+              <span id="sim-status-badge" class="px-2 py-0.5 text-[11px] font-mono rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                READY: Click any block or trigger a cycle
+              </span>
+            </div>
+            <p id="sim-live-narration" class="text-xs text-slate-400 mt-0.5 font-mono">
+              BIU prefetches instructions into the 6-byte FIFO queue while EU executes decoded instructions in parallel.
+            </p>
+          </div>
+        </div>
+
+        <!-- Simulation Action Buttons -->
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="simPrefetchByte()" class="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-blue-600/25 transition">
+            <span>📥</span> BIU Prefetch (+2 Bytes)
+          </button>
+          <button onclick="simExecuteInstruction()" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-emerald-600/25 transition">
+            <span>⚙️</span> EU Decode &amp; Execute
+          </button>
+          <button onclick="simAluOperation()" class="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-95 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-purple-600/25 transition">
+            <span>🧮</span> ALU Execute (ADD AX, BX)
+          </button>
+          <button onclick="simBranchFlush()" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-rose-600/25 transition">
+            <span>🔀</span> JMP / Branch (Flush Queue)
+          </button>
+          <button id="auto-sim-btn" onclick="toggleAutoPipeline()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition">
+            <span id="auto-sim-icon">▶</span> <span id="auto-sim-text">Auto Pipeline</span>
+          </button>
+          <button onclick="resetArchitectureState()" class="px-2.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white text-xs font-mono transition" title="Reset Registers & Queue">
+            ↺ Reset
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 1: MAIN ARCHITECTURAL DIAGRAM + INSPECTOR PANEL -->
+    <section id="schematic-section" class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+
+      <!-- LEFT 8 COLUMNS: COMPLETE 8086 ARCHITECTURE BLOCK DIAGRAM -->
+      <div class="xl:col-span-8 bg-slate-900/95 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl relative overflow-hidden">
+
+        <!-- Diagram Header Legend -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-4 mb-4 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-mono uppercase tracking-widest text-slate-400">Fig 1.0 — Intel 8086 Internal Block Diagram</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-4 text-xs">
+            <span class="flex items-center gap-1.5 text-emerald-400 font-medium">
+              <span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span> Execution Unit (EU)
+            </span>
+            <span class="flex items-center gap-1.5 text-blue-400 font-medium">
+              <span class="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block"></span> Bus Interface Unit (BIU)
+            </span>
+            <span class="flex items-center gap-1.5 text-amber-400 font-medium">
+              <span class="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block"></span> Internal / External Buses
+            </span>
+          </div>
+        </div>
+
+        <!-- EXTERNAL MEMORY & SYSTEM BUS INTERFACE AT TOP RIGHT -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
+          <!-- Left note: EU has no direct connection to external system bus -->
+          <div class="md:col-span-6 flex items-center justify-center border border-dashed border-emerald-500/30 rounded-xl bg-emerald-950/10 p-3 text-center">
+            <div>
+              <div class="text-xs font-mono uppercase tracking-wider text-emerald-400 font-semibold">Execution Unit (EU) Isolation</div>
+              <p class="text-[11px] text-slate-400 mt-0.5">
+                No direct connection to External System Buses. Processes instructions from the Queue &amp; requests memory operands via BIU.
+              </p>
+            </div>
+          </div>
+
+          <!-- Right: External Memory & System Buses connected to BIU -->
+          <div class="md:col-span-6">
+            <div onclick="selectBlock('EXTERNAL_BUS')" id="block-EXTERNAL_BUS" class="arch-block rounded-xl bg-gradient-to-r from-amber-500/20 via-blue-500/20 to-amber-500/20 border-2 border-amber-500/60 p-3 text-center">
+              <div class="flex items-center justify-between text-[11px] font-mono text-amber-300 mb-1">
+                <span>◄── 20-BIT ADDRESS BUS (A₀–A₁₉) ──►</span>
+                <span>◄── 16-BIT DATA BUS (D₀–D₁₅) ──►</span>
+              </div>
+              <div class="text-xs font-bold text-white tracking-wide uppercase">
+                External Memory (1 MB) &amp; I/O Interface Bus
+              </div>
+              <div class="text-[11px] text-slate-300 font-mono mt-0.5">
+                Multiplexed AD₀–AD₁₅ &amp; A₁₆/S₃–A₁₉/S₆ | Physical Range: <span class="text-amber-300">00000H – FFFFFH</span>
+              </div>
+            </div>
+            <!-- Vertical Bidirectional Bus Conduit into BIU -->
+            <div class="flex justify-around px-12">
+              <div id="conduit-ext-addr" class="w-3 h-5 bg-amber-500/50 border-x border-amber-400 relative overflow-hidden"></div>
+              <div id="conduit-ext-data" class="w-3 h-5 bg-blue-500/50 border-x border-blue-400 relative overflow-hidden"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TWO MAIN PARTITIONS: EXECUTION UNIT (LEFT) & BUS INTERFACE UNIT (RIGHT) -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-5 relative">
+
+          <!-- ========================================================== -->
+          <!-- PARTITION 1: EXECUTION UNIT (EU) - LEFT SIDE (6 COLUMNS)   -->
+          <!-- ========================================================== -->
+          <div class="md:col-span-6 rounded-2xl border-2 border-emerald-500/40 bg-emerald-950/10 p-4 flex flex-col justify-between relative">
+            <!-- Partition Badge -->
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-emerald-500/20">
+              <div>
+                <span class="text-xs font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Execution Unit (EU)
+                </span>
+              </div>
+              <span class="text-[11px] font-mono text-slate-400">Instruction Decode &amp; ALU Execution</span>
+            </div>
+
+            <!-- 1. GENERAL PURPOSE REGISTERS (AX, BX, CX, DX - Split AH/AL etc.) -->
+            <div class="mb-3">
+              <div class="flex items-center justify-between text-[11px] font-mono text-emerald-400 mb-1.5 px-1">
+                <span>GENERAL PURPOSE REGISTERS (16-BIT / 8-BIT SPLIT)</span>
+                <span>[H: 8-bit | L: 8-bit]</span>
+              </div>
+
+              <div class="space-y-1.5">
+                <!-- AX Register -->
+                <div onclick="selectBlock('REG_AX')" id="block-REG_AX" class="arch-block rounded-lg bg-slate-900/90 border border-emerald-500/40 p-2 hover:border-emerald-400">
+                  <div class="flex items-center justify-between text-[11px] font-mono mb-1">
+                    <span class="font-bold text-emerald-300">AX — Accumulator Register (16-bit)</span>
+                    <span id="val-AX" class="text-amber-300 font-bold">2410H</span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-1.5 text-center font-mono text-xs">
+                    <div class="bg-emerald-950/60 border border-emerald-500/30 rounded py-1 px-2 flex justify-between items-center">
+                      <span class="text-slate-400 text-[10px]">AH (8-bit)</span>
+                      <span id="val-AH" class="text-emerald-300 font-bold">24H</span>
+                    </div>
+                    <div class="bg-emerald-950/60 border border-emerald-500/30 rounded py-1 px-2 flex justify-between items-center">
+                      <span class="text-slate-400 text-[10px]">AL (8-bit)</span>
+                      <span id="val-AL" class="text-emerald-300 font-bold">10H</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- BX Register -->
+                <div onclick="selectBlock('REG_BX')" id="block-REG_BX" class="arch-block rounded-lg bg-slate-900/90 border border-emerald-500/40 p-2 hover:border-emerald-400">
+                  <div class="flex items-center justify-between text-[11px] font-mono mb-1">
+                    <span class="font-bold text-emerald-300">BX — Base Register (16-bit)</span>
+                    <span id="val-BX" class="text-amber-300 font-bold">0150H</span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-1.5 text-center font-mono text-xs">
+                    <div class="bg-emerald-950/60 border border-emerald-500/30 rounded py-1 px-2 flex justify-between items-center">
+                      <span class="text-slate-400 text-[10px]">BH (8-bit)</span>
+                      <span id="val-BH" class="text-emerald-300 font-bold">01H</span>
+                    </div>
+                    <div class="bg-emerald-950/60 border border-emerald-500/30 rounded py-1 px-2 flex justify-between items-center">
+                      <span class="text-slate-400 text-[10px]">BL (8-bit)</span>
+                      <span id="val-BL" class="text-emerald-300 font-bold">50H</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- CX Register -->
+                <div onclick="selectBlock('REG_CX')" id="block-REG_CX" class="arch-block rounded-lg bg-slate-900/90 border border-emerald-500/40 p-2 hover:border-emerald-400">
+                  <div class="flex items-center justify-between text-[11px] font-mono mb-1">
+                    <span class="font-bold text-emerald-300">CX — Count Register (16-bit)</span>
+                    <span id="val-CX" class="text-amber-300 font-bold">0008H</span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-1.5 text-center font-mono text-xs">
+                    <div class="bg-emerald-950/60 border border-emerald-500/30 rounded py-1 px-2 flex justify-between items-center">
+                      <span class="text-slate-400 text-[10px]">CH (8-bit)</span>
+                      <span id="val-CH" class="text-emerald-300 font-bold">00H</span>
+                    </div>
+                    <div class="bg-emerald-950/60 border border-emerald-500/30 rounded py-1 px-2 flex justify-between items-center">
+                      <span class="text-slate-400 text-[10px]">CL (8-bit)</span>
+                      <span id="val-CL" class="text-emerald-300 font-bold">08H</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- DX Register -->
+                <div onclick="selectBlock('REG_DX')" id="block-REG_DX" class="arch-block rounded-lg bg-slate-900/90 border border-emerald-500/40 p-2 hover:border-emerald-400">
+                  <div class="flex items-center justify-between text-[11px] font-mono mb-1">
+                    <span class="font-bold text-emerald-300">DX — Data Register (16-bit)</span>
+                    <span id="val-DX" class="text-amber-300 font-bold">03F8H</span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-1.5 text-center font-mono text-xs">
+                    <div class="bg-emerald-950/60 border border-emerald-500/30 rounded py-1 px-2 flex justify-between items-center">
+                      <span class="text-slate-400 text-[10px]">DH (8-bit)</span>
+                      <span id="val-DH" class="text-emerald-300 font-bold">03H</span>
+                    </div>
+                    <div class="bg-emerald-950/60 border border-emerald-500/30 rounded py-1 px-2 flex justify-between items-center">
+                      <span class="text-slate-400 text-[10px]">DL (8-bit)</span>
+                      <span id="val-DL" class="text-emerald-300 font-bold">F8H</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. POINTER & INDEX REGISTERS (SP, BP, SI, DI - 16-bit) -->
+            <div class="mb-3">
+              <div class="text-[11px] font-mono text-emerald-400 mb-1.5 px-1 flex justify-between">
+                <span>POINTER &amp; INDEX REGISTERS (16-BIT)</span>
+                <span>[OFFSET ADDRESSES]</span>
+              </div>
+              <div class="grid grid-cols-2 gap-1.5 font-mono text-xs">
+                <div onclick="selectBlock('REG_SP')" id="block-REG_SP" class="arch-block bg-slate-900/90 border border-emerald-500/40 rounded-lg p-2 flex items-center justify-between hover:border-emerald-400">
+                  <div>
+                    <div class="font-bold text-emerald-300">SP</div>
+                    <div class="text-[10px] text-slate-400">Stack Pointer</div>
+                  </div>
+                  <span id="val-SP" class="text-amber-300 font-bold">FFFEH</span>
+                </div>
+                <div onclick="selectBlock('REG_BP')" id="block-REG_BP" class="arch-block bg-slate-900/90 border border-emerald-500/40 rounded-lg p-2 flex items-center justify-between hover:border-emerald-400">
+                  <div>
+                    <div class="font-bold text-emerald-300">BP</div>
+                    <div class="text-[10px] text-slate-400">Base Pointer</div>
+                  </div>
+                  <span id="val-BP" class="text-amber-300 font-bold">0200H</span>
+                </div>
+                <div onclick="selectBlock('REG_SI')" id="block-REG_SI" class="arch-block bg-slate-900/90 border border-emerald-500/40 rounded-lg p-2 flex items-center justify-between hover:border-emerald-400">
+                  <div>
+                    <div class="font-bold text-emerald-300">SI</div>
+                    <div class="text-[10px] text-slate-400">Source Index</div>
+                  </div>
+                  <span id="val-SI" class="text-amber-300 font-bold">0400H</span>
+                </div>
+                <div onclick="selectBlock('REG_DI')" id="block-REG_DI" class="arch-block bg-slate-900/90 border border-emerald-500/40 rounded-lg p-2 flex items-center justify-between hover:border-emerald-400">
+                  <div>
+                    <div class="font-bold text-emerald-300">DI</div>
+                    <div class="text-[10px] text-slate-400">Dest. Index</div>
+                  </div>
+                  <span id="val-DI" class="text-amber-300 font-bold">0500H</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. 16-BIT EU INTERNAL DATA BUS (A-BUS) -->
+            <div onclick="selectBlock('EU_DATA_BUS')" id="block-EU_DATA_BUS" class="arch-block my-2 rounded-lg bg-amber-500/20 border-2 border-amber-500/60 py-1.5 px-3 text-center font-mono text-xs font-bold text-amber-300 flex items-center justify-between">
+              <span>◄═══</span>
+              <span>16-BIT INTERNAL DATA BUS (EU A-BUS)</span>
+              <span>═══►</span>
+            </div>
+
+            <!-- 4. TEMPORARY OPERAND REGISTERS + 16-BIT ALU -->
+            <div class="grid grid-cols-2 gap-2 my-1">
+              <div onclick="selectBlock('TEMP_REGS')" id="block-TEMP_REGS" class="arch-block bg-slate-900/90 border border-emerald-500/40 rounded-lg p-2 text-center font-mono">
+                <div class="text-[10px] text-slate-400 uppercase">ALU Input A</div>
+                <div class="text-xs font-bold text-emerald-300">Temp Register</div>
+                <div id="val-TEMP1" class="text-[11px] text-amber-300">2410H</div>
+              </div>
+              <div onclick="selectBlock('TEMP_REGS')" class="arch-block bg-slate-900/90 border border-emerald-500/40 rounded-lg p-2 text-center font-mono">
+                <div class="text-[10px] text-slate-400 uppercase">ALU Input B</div>
+                <div class="text-xs font-bold text-emerald-300">Operand Reg</div>
+                <div id="val-TEMP2" class="text-[11px] text-amber-300">0150H</div>
+              </div>
+            </div>
+
+            <!-- V-Shaped 16-Bit ALU -->
+            <div onclick="selectBlock('ALU')" id="block-ALU" class="arch-block my-2">
+              <div class="alu-polygon bg-gradient-to-b from-emerald-600/40 to-emerald-900/70 border-2 border-emerald-400 py-5 px-4 text-center shadow-lg">
+                <div class="text-xs font-mono font-extrabold text-white tracking-wider uppercase mt-2">
+                  16-Bit Arithmetic Logic Unit (ALU)
+                </div>
+                <div id="alu-op-display" class="text-[11px] font-mono text-emerald-200 mt-0.5">
+                  ADD / SUB / AND / OR / XOR / SHIFT / INC / DEC
+                </div>
+              </div>
+            </div>
+
+            <!-- 5. 16-BIT FLAG REGISTER (PSW) & EU CONTROL SYSTEM -->
+            <div class="space-y-2 mt-2">
+              <!-- Flag Register Block -->
+              <div onclick="selectBlock('FLAG_REG')" id="block-FLAG_REG" class="arch-block rounded-xl bg-slate-900 border-2 border-emerald-500/50 p-2.5">
+                <div class="flex items-center justify-between text-xs font-mono mb-1.5">
+                  <span class="font-bold text-emerald-300">16-Bit Flag Register (Status &amp; Control)</span>
+                  <span id="val-FLAGS-HEX" class="text-amber-300 font-bold">0202H</span>
+                </div>
+                <!-- Mini Live 9-Active Flags Strip -->
+                <div class="grid grid-cols-9 gap-1 text-center font-mono text-[10px]">
+                  <div class="bg-slate-950 border border-slate-700 rounded py-0.5">
+                    <div class="text-slate-400">OF</div>
+                    <div id="mini-flag-OF" class="font-bold text-emerald-400">0</div>
+                  </div>
+                  <div class="bg-slate-950 border border-slate-700 rounded py-0.5">
+                    <div class="text-slate-400">DF</div>
+                    <div id="mini-flag-DF" class="font-bold text-purple-400">0</div>
+                  </div>
+                  <div class="bg-slate-950 border border-slate-700 rounded py-0.5">
+                    <div class="text-slate-400">IF</div>
+                    <div id="mini-flag-IF" class="font-bold text-purple-400">1</div>
+                  </div>
+                  <div class="bg-slate-950 border border-slate-700 rounded py-0.5">
+                    <div class="text-slate-400">TF</div>
+                    <div id="mini-flag-TF" class="font-bold text-purple-400">0</div>
+                  </div>
+                  <div class="bg-slate-950 border border-slate-700 rounded py-0.5">
+                    <div class="text-slate-400">SF</div>
+                    <div id="mini-flag-SF" class="font-bold text-emerald-400">0</div>
+                  </div>
+                  <div class="bg-slate-950 border border-slate-700 rounded py-0.5">
+                    <div class="text-slate-400">ZF</div>
+                    <div id="mini-flag-ZF" class="font-bold text-emerald-400">0</div>
+                  </div>
+                  <div class="bg-slate-950 border border-slate-700 rounded py-0.5">
+                    <div class="text-slate-400">AF</div>
+                    <div id="mini-flag-AF" class="font-bold text-emerald-400">0</div>
+                  </div>
+                  <div class="bg-slate-950 border border-slate-700 rounded py-0.5">
+                    <div class="text-slate-400">PF</div>
+                    <div id="mini-flag-PF" class="font-bold text-emerald-400">0</div>
+                  </div>
+                  <div class="bg-slate-950 border border-slate-700 rounded py-0.5">
+                    <div class="text-slate-400">CF</div>
+                    <div id="mini-flag-CF" class="font-bold text-emerald-400">0</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- EU Control System & Instruction Decoder -->
+              <div onclick="selectBlock('EU_CONTROL')" id="block-EU_CONTROL" class="arch-block rounded-xl bg-gradient-to-r from-emerald-900/60 via-teal-900/60 to-emerald-900/60 border-2 border-emerald-400/60 p-3 text-center">
+                <div class="text-xs font-bold text-white uppercase tracking-wider">
+                  EU Control System &amp; Instruction Decoder
+                </div>
+                <div id="eu-decoder-status" class="text-[11px] font-mono text-emerald-300 mt-0.5">
+                  Current IR: MOV AX, [SI] (Generates Internal Timing &amp; Control Signals)
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========================================================== -->
+          <!-- PARTITION 2: BUS INTERFACE UNIT (BIU) - RIGHT SIDE (6 COLS) -->
+          <!-- ========================================================== -->
+          <div class="md:col-span-6 rounded-2xl border-2 border-blue-500/40 bg-blue-950/10 p-4 flex flex-col justify-between relative">
+            <!-- Partition Badge -->
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-blue-500/20">
+              <div>
+                <span class="text-xs font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                  Bus Interface Unit (BIU)
+                </span>
+              </div>
+              <span class="text-[11px] font-mono text-slate-400">Address Generation &amp; Instruction Fetch</span>
+            </div>
+
+            <!-- 1. 20-BIT PHYSICAL ADDRESS ADDER (Σ) & BUS CONTROL LOGIC -->
+            <div onclick="selectBlock('ADDR_ADDER')" id="block-ADDR_ADDER" class="arch-block mb-3">
+              <div class="adder-polygon bg-gradient-to-b from-blue-600/40 to-indigo-900/70 border-2 border-blue-400 py-4 px-4 text-center shadow-lg">
+                <div class="text-sm font-mono font-extrabold text-white tracking-wider mt-1">
+                  Σ 20-Bit Physical Address Adder
+                </div>
+                <div class="text-[11px] font-mono text-blue-200 mt-0.5">
+                  PA = (Segment × 10H) + Offset
+                </div>
+                <div id="diagram-live-pa" class="text-xs font-mono font-bold text-amber-300 mt-1">
+                  CS:IP = 20000H + 0104H = 20104H
+                </div>
+              </div>
+            </div>
+
+            <!-- Bus Control Logic -->
+            <div onclick="selectBlock('BUS_CONTROL')" id="block-BUS_CONTROL" class="arch-block rounded-xl bg-slate-900/90 border border-blue-500/50 p-2.5 mb-3 text-center">
+              <div class="text-xs font-bold text-blue-300 uppercase tracking-wider">External Bus Control Logic</div>
+              <div class="text-[11px] font-mono text-slate-400">
+                 generates <span class="text-slate-200">ALE, RD̅, WR̅, M/IO̅, DT/R̅, DEN̅, BHE̅</span> (T₁–T₄ Bus Cycles)
+              </div>
+            </div>
+
+            <!-- 2. SEGMENT REGISTERS (ES, CS, SS, DS) & INSTRUCTION POINTER (IP) -->
+            <div class="mb-3">
+              <div class="flex items-center justify-between text-[11px] font-mono text-blue-400 mb-1.5 px-1">
+                <span>SEGMENT REGISTERS &amp; INSTRUCTION POINTER (16-BIT)</span>
+                <span>[64 KB SEGMENTS]</span>
+              </div>
+
+              <div class="space-y-1.5 font-mono text-xs">
+                <!-- ES -->
+                <div onclick="selectBlock('REG_ES')" id="block-REG_ES" class="arch-block rounded-lg bg-slate-900/90 border border-blue-500/40 p-2 flex items-center justify-between hover:border-blue-400">
+                  <div>
+                    <span class="font-bold text-blue-300">ES</span>
+                    <span class="text-slate-400 text-[11px] ml-2">Extra Segment Register (String Dest)</span>
+                  </div>
+                  <span id="val-ES" class="text-amber-300 font-bold">4000H</span>
+                </div>
+
+                <!-- CS -->
+                <div onclick="selectBlock('REG_CS')" id="block-REG_CS" class="arch-block rounded-lg bg-slate-900/90 border border-blue-500/40 p-2 flex items-center justify-between hover:border-blue-400">
+                  <div>
+                    <span class="font-bold text-blue-300">CS</span>
+                    <span class="text-slate-400 text-[11px] ml-2">Code Segment Register (Program Code)</span>
+                  </div>
+                  <span id="val-CS" class="text-amber-300 font-bold">2000H</span>
+                </div>
+
+                <!-- SS -->
+                <div onclick="selectBlock('REG_SS')" id="block-REG_SS" class="arch-block rounded-lg bg-slate-900/90 border border-blue-500/40 p-2 flex items-center justify-between hover:border-blue-400">
+                  <div>
+                    <span class="font-bold text-blue-300">SS</span>
+                    <span class="text-slate-400 text-[11px] ml-2">Stack Segment Register (LIFO Stack)</span>
+                  </div>
+                  <span id="val-SS" class="text-amber-300 font-bold">5000H</span>
+                </div>
+
+                <!-- DS -->
+                <div onclick="selectBlock('REG_DS')" id="block-REG_DS" class="arch-block rounded-lg bg-slate-900/90 border border-blue-500/40 p-2 flex items-center justify-between hover:border-blue-400">
+                  <div>
+                    <span class="font-bold text-blue-300">DS</span>
+                    <span class="text-slate-400 text-[11px] ml-2">Data Segment Register (Default Data)</span>
+                  </div>
+                  <span id="val-DS" class="text-amber-300 font-bold">3000H</span>
+                </div>
+
+                <!-- IP (Instruction Pointer) -->
+                <div onclick="selectBlock('REG_IP')" id="block-REG_IP" class="arch-block rounded-lg bg-indigo-950/80 border-2 border-indigo-400/60 p-2 flex items-center justify-between hover:border-indigo-300">
+                  <div>
+                    <span class="font-bold text-indigo-300">IP</span>
+                    <span class="text-indigo-200 text-[11px] ml-2">Instruction Pointer (Offset in CS)</span>
+                  </div>
+                  <span id="val-IP" class="text-amber-300 font-bold">0104H</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. INTERNAL COMMUNICATION REGISTERS & B-BUS -->
+            <div onclick="selectBlock('COMM_REGS')" id="block-COMM_REGS" class="arch-block my-1.5 rounded-lg bg-slate-900/90 border border-blue-500/40 py-2 px-3 text-center font-mono text-xs">
+              <div class="font-bold text-blue-300">16-Bit Internal Communication Registers</div>
+              <div class="text-[10px] text-slate-400">Temporary Holding Latches between EU A-Bus &amp; BIU B-Bus</div>
+            </div>
+
+            <!-- 4. 6-BYTE INSTRUCTION PREFETCH QUEUE (FIFO) -->
+            <div onclick="selectBlock('INST_QUEUE')" id="block-INST_QUEUE" class="arch-block mt-2 rounded-xl bg-gradient-to-b from-blue-950/90 to-slate-900 border-2 border-amber-500/70 p-3 shadow-lg">
+              <div class="flex items-center justify-between mb-2">
+                <div>
+                  <span class="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                    6-Byte Instruction Object Code Queue (FIFO)
+                  </span>
+                  <div class="text-[10px] text-slate-400 font-mono">
+                    Pipelining Buffer: Refills when ≥ 2 bytes are empty
+                  </div>
+                </div>
+                <span id="queue-count-badge" class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-xs font-bold border border-amber-500/40">
+                  4 / 6 Bytes
+                </span>
+              </div>
+
+              <!-- 6-Slot Visual Queue Grid -->
+              <div id="queue-slots-container" class="grid grid-cols-6 gap-1.5 font-mono text-center">
+                <!-- Populated dynamically by JS -->
+              </div>
+
+              <!-- Queue Pipeline Link Indicator to EU Control System -->
+              <div class="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] font-mono text-emerald-400">
+                <span>◄══ Feeds Opcode Bytes to EU Decoder (Q-Bus)</span>
+                <span class="text-blue-400">▲ Filled by BIU</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT 4 COLUMNS: INTERACTIVE ARCHITECTURAL INSPECTOR & LIVE EXECUTION LOG -->
+      <div class="xl:col-span-4 space-y-6">
+
+        <!-- COMPONENT SPECIFICATION INSPECTOR CARD -->
+        <div class="bg-slate-900/95 border border-slate-800 rounded-2xl p-5 shadow-2xl">
+          <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+            <div class="flex items-center gap-2">
+              <span id="inspector-unit-pill" class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                EXECUTION UNIT (EU)
+              </span>
+              <span id="inspector-width-pill" class="px-2 py-0.5 rounded text-xs font-mono bg-slate-800 text-amber-300">
+                16-Bit (AH:AL)
+              </span>
+            </div>
+            <span class="text-[11px] font-mono text-slate-500">Click any block</span>
+          </div>
+
+          <h3 id="inspector-title" class="text-lg font-extrabold text-white tracking-tight">
+            AX — Accumulator Register
+          </h3>
+          <p id="inspector-subtitle" class="text-xs font-mono text-blue-400 mt-0.5 mb-3">
+            Primary Arithmetic, Logic &amp; I/O Accumulator (Split into 8-bit AH and AL)
+          </p>
+
+          <p id="inspector-desc" class="text-sm text-slate-300 leading-relaxed mb-4">
+            AX is the preferred 16-bit accumulator in the Execution Unit. Using AX/AL often results in shorter, 1-byte machine opcodes and faster execution compared to other general-purpose registers.
+          </p>
+
+          <!-- Key Technical & Exam Highlights -->
+          <div class="bg-slate-950/90 border border-slate-800/90 rounded-xl p-3.5 mb-4">
+            <div class="text-xs font-mono font-bold uppercase tracking-wider text-amber-400 mb-2 flex items-center gap-1.5">
+              <span>📌</span> Dedicated Hardware Functions &amp; Exam Points
+            </div>
+            <ul id="inspector-bullets" class="space-y-1.5 text-xs text-slate-300 list-disc list-inside">
+              <!-- Populated by JS -->
+            </ul>
+          </div>
+
+          <!-- Quick Preset Selector Pills -->
+          <div>
+            <div class="text-[11px] font-mono uppercase text-slate-400 mb-2">Quick Inspect Key Units:</div>
+            <div class="flex flex-wrap gap-1.5">
+              <button onclick="selectBlock('INST_QUEUE')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-amber-300 transition">6-Byte Queue</button>
+              <button onclick="selectBlock('ADDR_ADDER')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-blue-300 transition">20-Bit Adder</button>
+              <button onclick="selectBlock('ALU')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-emerald-300 transition">16-Bit ALU</button>
+              <button onclick="selectBlock('FLAG_REG')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-emerald-300 transition">Flag Register</button>
+              <button onclick="selectBlock('REG_CS')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-blue-300 transition">CS &amp; IP</button>
+              <button onclick="selectBlock('REG_CX')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-emerald-300 transition">CX (Loop)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- EU vs BIU COMPARISON SUMMARY TABLE -->
+        <div class="bg-slate-900/95 border border-slate-800 rounded-2xl p-5 shadow-2xl">
+          <h3 class="text-sm font-bold uppercase tracking-wider text-slate-200 mb-3 flex items-center justify-between">
+            <span>EU vs. BIU Architectural Split</span>
+            <span class="text-[11px] font-mono text-amber-400">2-Stage Pipelining</span>
+          </h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-400 font-mono">
+                  <th class="py-2 pr-2">Parameter</th>
+                  <th class="py-2 px-2 text-emerald-400">Execution Unit (EU)</th>
+                  <th class="py-2 pl-2 text-blue-400">Bus Interface Unit (BIU)</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/70 text-slate-300">
+                <tr>
+                  <td class="py-2 pr-2 font-medium text-slate-400">Primary Role</td>
+                  <td class="py-2 px-2">Decodes &amp; executes instructions</td>
+                  <td class="py-2 pl-2">Fetches instructions &amp; data from memory/I/O</td>
+                </tr>
+                <tr>
+                  <td class="py-2 pr-2 font-medium text-slate-400">Registers</td>
+                  <td class="py-2 px-2 font-mono">AX, BX, CX, DX, SP, BP, SI, DI, Flags</td>
+                  <td class="py-2 pl-2 font-mono">CS, DS, SS, ES, IP</td>
+                </tr>
+                <tr>
+                  <td class="py-2 pr-2 font-medium text-slate-400">Computation</td>
+                  <td class="py-2 px-2">16-bit ALU (Arithmetic &amp; Logic)</td>
+                  <td class="py-2 pl-2">20-bit Address Adder (Σ)</td>
+                </tr>
+                <tr>
+                  <td class="py-2 pr-2 font-medium text-slate-400">External Bus</td>
+                  <td class="py-2 px-2 text-rose-400">No direct connection</td>
+                  <td class="py-2 pl-2 text-emerald-400">Connected to 20-bit Addr &amp; 16-bit Data bus</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- LIVE PIPELINE TRACE LOG -->
+        <div class="bg-slate-900/95 border border-slate-800 rounded-2xl p-4 shadow-xl">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">Live Micro-Operation Trace</span>
+            <button onclick="clearTraceLog()" class="text-[11px] font-mono text-slate-500 hover:text-slate-300">Clear</button>
+          </div>
+          <div id="trace-log-container" class="h-36 overflow-y-auto space-y-1.5 font-mono text-[11px] bg-slate-950 rounded-xl p-3 border border-slate-800">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- SECTION 2: INTERACTIVE 20-BIT PHYSICAL ADDRESS CALCULATOR (SEGMENTATION) -->
+    <!-- ===================================================================== -->
+    <section id="address-calc-section" class="bg-slate-900/95 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-2xl">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 mb-6 border-b border-slate-800">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+              BIU ADDRESS GENERATION UNIT (Σ)
+            </span>
+            <h2 class="text-lg sm:text-xl font-extrabold text-white">Interactive 20-Bit Physical Address Calculator</h2>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">
+            Because 8086 registers are 16-bit (max <span class="font-mono text-slate-200">64 KB</span>), the BIU shifts the 16-bit Segment Register left by 4 bits (<span class="font-mono text-amber-300">× 10H</span>) and adds the 16-bit Offset to generate a 20-bit Physical Address (<span class="font-mono text-emerald-300">1 MB</span> range).
+          </p>
+        </div>
+
+        <!-- Default Segment:Offset Pairing Presets -->
+        <div class="flex flex-wrap gap-1.5">
+          <button onclick="setAddressPreset('CS', 'IP', '2000', '1234')" class="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 text-xs font-mono transition">
+            Code Fetch (CS:IP)
+          </button>
+          <button onclick="setAddressPreset('DS', 'SI', '3000', '0450')" class="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-mono transition">
+            Data Access (DS:SI)
+          </button>
+          <button onclick="setAddressPreset('SS', 'SP', '5000', 'FFFE')" class="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 text-xs font-mono transition">
+            Stack Push (SS:SP)
+          </button>
+          <button onclick="setAddressPreset('ES', 'DI', '4000', '0800')" class="px-3 py-1.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 text-xs font-mono transition">
+            String Dest (ES:DI)
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        <!-- Controls Column (5 cols) -->
+        <div class="lg:col-span-5 space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <!-- Segment Picker & Hex Input -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+              <label class="block text-xs font-mono uppercase text-blue-400 mb-1.5">1. Segment Register</label>
+              <select id="calc-seg-select" onchange="updatePhysicalAddressCalc()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white mb-2 focus:outline-none focus:border-blue-500">
+                <option value="CS">CS (Code Segment)</option>
+                <option value="DS">DS (Data Segment)</option>
+                <option value="SS">SS (Stack Segment)</option>
+                <option value="ES">ES (Extra Segment)</option>
+              </select>
+              <label class="block text-[11px] font-mono text-slate-400 mb-1">16-Bit Hex Value (0000–FFFF):</label>
+              <div class="flex items-center">
+                <input id="calc-seg-input" type="text" maxlength="4" value="2000" oninput="updatePhysicalAddressCalc()" class="w-full bg-slate-900 border border-blue-500/50 rounded-l-lg px-3 py-2 font-mono text-base font-bold text-amber-300 uppercase focus:outline-none focus:border-blue-400" />
+                <span class="bg-slate-800 border border-l-0 border-slate-700 px-3 py-2 rounded-r-lg font-mono text-sm text-slate-400">H</span>
+              </div>
+            </div>
+
+            <!-- Offset Picker & Hex Input -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+              <label class="block text-xs font-mono uppercase text-emerald-400 mb-1.5">2. Offset / Effective Addr</label>
+              <select id="calc-off-select" onchange="updatePhysicalAddressCalc()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white mb-2 focus:outline-none focus:border-emerald-500">
+                <option value="IP">IP (Instruction Pointer)</option>
+                <option value="BX">BX (Base Register)</option>
+                <option value="SI">SI (Source Index)</option>
+                <option value="DI">DI (Destination Index)</option>
+                <option value="SP">SP (Stack Pointer)</option>
+                <option value="BP">BP (Base Pointer)</option>
+              </select>
+              <label class="block text-[11px] font-mono text-slate-400 mb-1">16-Bit Hex Value (0000–FFFF):</label>
+              <div class="flex items-center">
+                <input id="calc-off-input" type="text" maxlength="4" value="1234" oninput="updatePhysicalAddressCalc()" class="w-full bg-slate-900 border border-emerald-500/50 rounded-l-lg px-3 py-2 font-mono text-base font-bold text-emerald-300 uppercase focus:outline-none focus:border-emerald-400" />
+                <span class="bg-slate-800 border border-l-0 border-slate-700 px-3 py-2 rounded-r-lg font-mono text-sm text-slate-400">H</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Standard Default Segment-Offset Rules Reference Box -->
+          <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 text-xs">
+            <div class="font-mono font-bold text-slate-300 mb-1.5">Default Hardware Segment : Offset Pairings</div>
+            <div class="grid grid-cols-2 gap-2 font-mono text-[11px]">
+              <div class="p-1.5 rounded bg-slate-900 border border-slate-800"><span class="text-blue-400">CS : IP</span> → Instruction Fetch</div>
+              <div class="p-1.5 rounded bg-slate-900 border border-slate-800"><span class="text-purple-400">SS : SP / BP</span> → Stack Access</div>
+              <div class="p-1.5 rounded bg-slate-900 border border-slate-800"><span class="text-emerald-400">DS : BX / SI / DI</span> → Data R/W</div>
+              <div class="p-1.5 rounded bg-slate-900 border border-slate-800"><span class="text-amber-400">ES : DI</span> → String Dest.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Visual Step-by-Step Hardware Adder Breakdown (7 cols) -->
+        <div class="lg:col-span-7 bg-slate-950 border border-slate-800 rounded-2xl p-4 sm:p-5 font-mono">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-800">
+            <span class="text-xs text-slate-400">LOGICAL ADDRESS: <strong id="calc-logical-str" class="text-white">2000H : 1234H</strong></span>
+            <span id="calc-wraparound-badge" class="hidden px-2 py-0.5 rounded text-[11px] bg-rose-500/20 text-rose-300 border border-rose-500/40">
+              ⚠️ 20-Bit Overflow (Wraps around 1 MB boundary)
+            </span>
+          </div>
+
+          <div class="space-y-3 text-sm">
+            <!-- Step 1: Segment Shifted Left by 4 bits -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-slate-900/90 border border-blue-500/30 rounded-xl p-3 gap-2">
+              <div>
+                <div class="text-xs text-blue-400 font-semibold">Step 1: Segment Base Address (Shift Left 4 bits / × 10H)</div>
+                <div id="calc-bin-seg" class="text-[11px] text-slate-400 mt-0.5">0010 0000 0000 0000 <span class="text-amber-400 font-bold">0000</span>₂</div>
+              </div>
+              <div class="text-right">
+                <span id="calc-hex-shifted" class="text-lg font-extrabold text-blue-300 tracking-wider">20000H</span>
+              </div>
+            </div>
+
+            <!-- Step 2: Offset Added -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-slate-900/90 border border-emerald-500/30 rounded-xl p-3 gap-2">
+              <div>
+                <div class="text-xs text-emerald-400 font-semibold">+ Step 2: Add 16-Bit Effective Offset Address</div>
+                <div id="calc-bin-off" class="text-[11px] text-slate-400 mt-0.5">0000 0001 0010 0011 0100₂</div>
+              </div>
+              <div class="text-right">
+                <span id="calc-hex-offset" class="text-lg font-extrabold text-emerald-300 tracking-wider">+ 01234H</span>
+              </div>
+            </div>
+
+            <!-- Step 3: Resulting 20-Bit Physical Address -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-gradient-to-r from-amber-500/20 via-blue-500/20 to-emerald-500/20 border-2 border-amber-400 rounded-xl p-3.5 gap-2">
+              <div>
+                <div class="text-xs text-amber-300 font-bold uppercase">= 20-Bit Physical Address Output (To A₀–A₁₉ Bus)</div>
+                <div id="calc-bin-pa" class="text-xs text-slate-200 mt-0.5">0010 0001 0010 0011 0100₂</div>
+              </div>
+              <div class="text-right">
+                <div id="calc-hex-pa" class="text-2xl font-extrabold text-amber-300 tracking-widest">21234H</div>
+                <div id="calc-segment-range" class="text-[10px] text-slate-300">Active 64KB Segment Range: 20000H – 2FFFFH</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- SECTION 3: INTERACTIVE 16-BIT FLAG REGISTER EXPLORER (PSW)            -->
+    <!-- ===================================================================== -->
+    <section id="flag-explorer-section" class="bg-slate-900/95 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-2xl">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 mb-6 border-b border-slate-800">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              PROGRAM STATUS WORD (PSW)
+            </span>
+            <h2 class="text-lg sm:text-xl font-extrabold text-white">Interactive 16-Bit Flag Register Explorer</h2>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">
+            Click any bit in the 16-bit register below to inspect its function and toggle its state (`0` or `1`). Contains <strong class="text-emerald-400">6 Conditional/Status Flags</strong> and <strong class="text-purple-400">3 Control Flags</strong>.
+          </p>
+        </div>
+
+        <!-- Flag Test Scenario Presets -->
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-xs font-mono text-slate-400 mr-1">Test Scenarios:</span>
+          <button onclick="applyFlagPreset('ZERO')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-mono text-emerald-300 border border-slate-700 transition">
+            Zero Result (ZF=1, PF=1)
+          </button>
+          <button onclick="applyFlagPreset('OVERFLOW')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-mono text-rose-300 border border-slate-700 transition">
+            Signed Overflow (OF=1, SF=1)
+          </button>
+          <button onclick="applyFlagPreset('STRING_DEC')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-mono text-purple-300 border border-slate-700 transition">
+            Auto-Decrement String (DF=1)
+          </button>
+          <button onclick="applyFlagPreset('CLEAR')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300 border border-slate-700 transition">
+            Clear All
+          </button>
+        </div>
+      </div>
+
+      <!-- 16-BIT INTERACTIVE GRID (D15 down to D0) -->
+      <div class="overflow-x-auto pb-2">
+        <div id="flag-16bit-grid" class="grid grid-cols-16 min-w-[920px] gap-1.5 font-mono text-center">
+          <!-- Rendered dynamically by JS -->
+        </div>
+      </div>
+
+      <!-- Legend & Selected Flag Detail Card -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-5 items-center">
+        <div class="lg:col-span-8 bg-slate-950 border border-slate-800 rounded-xl p-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2">
+              <span id="flag-detail-badge" class="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                Bit D0 — Status Flag
+              </span>
+              <h3 id="flag-detail-title" class="text-base font-bold text-white">
+                CF — Carry Flag
+              </h3>
+            </div>
+            <button id="flag-toggle-btn" onclick="toggleSelectedFlagBit()" class="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-semibold transition">
+              Toggle Bit Value (0 / 1)
+            </button>
+          </div>
+          <p id="flag-detail-desc" class="text-xs sm:text-sm text-slate-300 leading-relaxed mb-3">
+            Set to 1 if an arithmetic operation generates a carry out of or a borrow into the Most Significant Bit (D7 for byte, D15 for word). Also used in rotate and shift instructions.
+          </p>
+          <div id="flag-detail-asm" class="text-xs font-mono text-amber-300 bg-slate-900/90 border border-slate-800 rounded-lg px-3 py-2">
+            Related Assembly Instructions: JC (Jump if Carry), JNC (Jump if No Carry), STC (Set CF=1), CLC (Clear CF=0), CMC (Complement CF)
+          </div>
+        </div>
+
+        <!-- Flag Categories Summary -->
+        <div class="lg:col-span-4 bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5 text-xs">
+          <div class="flex items-center justify-between font-mono">
+            <span class="text-slate-400">16-Bit Flag Register Hex:</span>
+            <span id="flag-total-hex" class="text-base font-bold text-amber-300">0202H</span>
+          </div>
+          <div class="p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-500/30">
+            <div class="font-bold text-emerald-300">6 Conditional / Status Flags (ALU Set)</div>
+            <div class="text-slate-400 font-mono text-[11px] mt-0.5">CF (D0), PF (D2), AF (D4), ZF (D6), SF (D7), OF (D11)</div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-purple-950/30 border border-purple-500/30">
+            <div class="font-bold text-purple-300">3 Control Flags (Programmer Set)</div>
+            <div class="text-slate-400 font-mono text-[11px] mt-0.5">TF (D8 - Trap), IF (D9 - Interrupt), DF (D10 - Direction)</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 border-t border-slate-800/80 text-center text-xs text-slate-500 font-mono">
+    Intel 8086 Microprocessor Architecture Interactive Reference • 16-Bit Internal Data Bus • 20-Bit External Address Bus • 6-Byte Pipelined Instruction Queue
+  </footer>
+
+  <!-- ===================================================================== -->
+  <!-- APPLICATION LOGIC & ARCHITECTURAL DATABASE                            -->
+  <!-- ===================================================================== -->
+  <script>
+    // 1. ARCHITECTURAL BLOCK SPECIFICATIONS DATABASE
+    const ARCH_SPECS = {
+      REG_AX: {
+        unit: 'EXECUTION UNIT (EU)',
+        unitType: 'eu',
+        width: '16-Bit (AH: 8-bit, AL: 8-bit)',
+        title: 'AX — Accumulator Register',
+        subtitle: 'Primary 16-Bit Arithmetic, Logic & I/O Accumulator',
+        desc: 'AX is the principal general-purpose accumulator register inside the Execution Unit. It can be used as a full 16-bit register (AX) or split into two independent 8-bit registers: AH (High byte) and AL (Low byte).',
+        bullets: [
+          'Implicit operand for 8-bit and 16-bit Multiply (MUL/IMUL) and Divide (DIV/IDIV) instructions.',
+          'Mandatory register for all Input/Output port transfers (IN AL/AX, DX and OUT DX, AL/AX).',
+          'Used implicitly in String operations (LODS, STOS, SCAS) and BCD/ASCII adjustments (DAA, DAS, AAA, AAM).',
+          'Instructions using AX/AL often have shorter 1-byte machine encodings for faster execution.'
+        ]
+      },
+      REG_BX: {
+        unit: 'EXECUTION UNIT (EU)',
+        unitType: 'eu',
+        width: '16-Bit (BH: 8-bit, BL: 8-bit)',
+        title: 'BX — Base Register',
+        subtitle: 'General Purpose & Memory Base Addressing Register',
+        desc: 'BX serves both as a general-purpose data register (split into 8-bit BH and BL) and as the only general-purpose register that can hold an offset address for memory addressing.',
+        bullets: [
+          'Only general-purpose register usable as a memory pointer: e.g., MOV AX, [BX] accesses Data Segment (DS:BX).',
+          'Used implicitly by the XLAT (Translate Byte) instruction for lookup table indexing (AL ← DS:[BX + AL]).',
+          'Can be combined with index registers SI or DI for Based-Indexed addressing: [BX + SI + disp].'
+        ]
+      },
+      REG_CX: {
+        unit: 'EXECUTION UNIT (EU)',
+        unitType: 'eu',
+        width: '16-Bit (CH: 8-bit, CL: 8-bit)',
+        title: 'CX — Count Register',
+        subtitle: 'Default Loop, String Repetition & Bit-Shift Counter',
+        desc: 'CX is used both for general 16-bit/8-bit data storage (CH and CL) and as the hardware-designated counter for iterative operations in the 8086.',
+        bullets: [
+          'Automatically decremented by 1 in LOOP, LOOPE/LOOPZ, and LOOPNE/LOOPNZ instructions until CX = 0.',
+          'Holds repetition count for REP / REPE / REPNE prefixed string instructions (MOVSB, CMPSB, SCASB).',
+          '8-bit CL register holds the variable bit-shift/rotate count for SHL, SHR, SAL, SAR, ROL, ROR (e.g., SHL AX, CL).',
+          'JCXZ instruction tests CX directly and branches if CX == 0000H.'
+        ]
+      },
+      REG_DX: {
+        unit: 'EXECUTION UNIT (EU)',
+        unitType: 'eu',
+        width: '16-Bit (DH: 8-bit, DL: 8-bit)',
+        title: 'DX — Data Register',
+        subtitle: '32-Bit Arithmetic Extension & Indirect I/O Port Pointer',
+        desc: 'DX cooperates closely with AX for 32-bit arithmetic operations and holds the 16-bit I/O port address during variable port addressing.',
+        bullets: [
+          'Holds the upper 16 bits of a 32-bit product (DX:AX) in 16-bit multiplication (MUL/IMUL).',
+          'Holds the upper 16 bits of a 32-bit dividend before 16-bit division (DIV/IDIV) and receives the 16-bit remainder.',
+          'Holds the 16-bit I/O Port Address (0000H–FFFFH, up to 64K ports) for IN and OUT instructions.'
+        ]
+      },
+      REG_SP: {
+        unit: 'EXECUTION UNIT (EU)',
+        unitType: 'eu',
+        width: '16-Bit Offset Pointer',
+        title: 'SP — Stack Pointer Register',
+        subtitle: 'Points to Top of Hardware LIFO Stack in Stack Segment (SS)',
+        desc: 'SP holds the 16-bit offset address of the current Top of Stack within the Stack Segment. Combined with SS by the BIU as (SS × 10H) + SP.',
+        bullets: [
+          '8086 stack grows downwards in memory: PUSH decrements SP by 2 (SP ← SP - 2) and stores a 16-bit word.',
+          'POP reads a 16-bit word from SS:SP and increments SP by 2 (SP ← SP + 2).',
+          'Automatically updated during CALL, RET, INT (Interrupt), and IRET instructions.'
+        ]
+      },
+      REG_BP: {
+        unit: 'EXECUTION UNIT (EU)',
+        unitType: 'eu',
+        width: '16-Bit Offset Pointer',
+        title: 'BP — Base Pointer Register',
+        subtitle: 'Stack Frame Parameter & Local Variable Pointer (Default SS)',
+        desc: 'BP is a 16-bit pointer primarily used to random-access parameters and local variables pushed onto the stack frame by high-level procedure calls.',
+        bullets: [
+          'Defaults to the Stack Segment (SS) instead of DS when used as a memory pointer: e.g., MOV AX, [BP+4].',
+          'Allows accessing data anywhere inside the stack without altering the Top-of-Stack pointer (SP).'
+        ]
+      },
+      REG_SI: {
+        unit: 'EXECUTION UNIT (EU)',
+        unitType: 'eu',
+        width: '16-Bit Index Register',
+        title: 'SI — Source Index Register',
+        subtitle: 'Index Pointer for Data Arrays & String Source Operands',
+        desc: 'SI holds a 16-bit offset address relative to the Data Segment (DS) during indexed addressing modes and string manipulation instructions.',
+        bullets: [
+          'Implicitly points to the Source String in Data Segment (DS:SI) for MOVS, LODS, and CMPS string instructions.',
+          'Automatically increments (if DF=0) or decrements (if DF=1) by 1 (byte) or 2 (word) during string operations.'
+        ]
+      },
+      REG_DI: {
+        unit: 'EXECUTION UNIT (EU)',
+        unitType: 'eu',
+        width: '16-Bit Index Register',
+        title: 'DI — Destination Index Register',
+        subtitle: 'Index Pointer for Arrays & String Destination (ES:DI)',
+        desc: 'DI is a 16-bit index register used for general indexed addressing in DS, and specifically paired with the Extra Segment (ES) for string destinations.',
+        bullets: [
+          'Implicitly points to the Destination String in Extra Segment (ES:DI) for MOVS, STOS, CMPS, and SCAS.',
+          'Auto-increments (DF=0) or auto-decrements (DF=1) after each string operation.'
+        ]
+      },
+      EU_DATA_BUS: {
+        unit: 'EXECUTION UNIT (EU)',
+        unitType: 'shared',
+        width: '16-Bit Internal Bus',
+        title: '16-Bit EU Internal Data Bus (A-Bus)',
+        subtitle: 'High-Speed Internal Conduit Connecting Registers, ALU & BIU Latches',
+        desc: 'A 16-bit bidirectional internal bus inside the Execution Unit that transfers 8-bit or 16-bit operands between General Purpose Registers, Pointer/Index Registers, Temporary Registers, and the ALU.',
+        bullets: [
+          'Allows full 16-bit word transfers in a single internal clock phase.',
+          'Bridges to the BIU Internal Communication Registers when memory operands or segment register updates are required.'
+        ]
+      },
+      TEMP_REGS: {
+        unit: 'EXECUTION UNIT (EU)',
+        unitType: 'eu',
+        width: '16-Bit Internal Latches',
+        title: 'Temporary / Operand Registers',
+        subtitle: 'Invisible Hardware Latches Holding ALU Operands',
+        desc: 'Not directly accessible to the assembly programmer. These temporary holding registers latch the two source operands from the 16-bit EU Internal Data Bus so the combinational ALU can process them simultaneously.',
+        bullets: [
+          'Prevents race conditions when the same register is both a source and destination (e.g., ADD AX, AX).',
+          'Assists in multi-step microcoded operations like MUL, DIV, and effective address calculation.'
+        ]
+      },
+      ALU: {
+        unit: 'EXECUTION UNIT (EU)',
+        unitType: 'eu',
+        width: '16-Bit / 8-Bit Combinational Unit',
+        title: '16-Bit Arithmetic Logic Unit (ALU)',
+        subtitle: 'Core Computational Engine of the 8086 Microprocessor',
+        desc: 'Performs all 8-bit and 16-bit arithmetic (addition, subtraction, multiplication, division, increment, decrement, BCD adjustment) and bitwise logical operations (AND, OR, XOR, NOT, TEST, Shifts, Rotates).',
+        bullets: [
+          'Takes inputs from the Temporary Operand Registers and writes the result back onto the 16-bit EU Internal Data Bus.',
+          'Automatically updates the 6 Status Flags (CF, PF, AF, ZF, SF, OF) in the Flag Register after every operation.'
+        ]
+      },
+      FLAG_REG: {
+        unit: 'EXECUTION UNIT (EU)',
+        unitType: 'eu',
+        width: '16-Bit Program Status Word (9 Active Flags)',
+        title: '16-Bit Flag Register (Flags / PSW)',
+        subtitle: '6 Conditional Status Flags + 3 Machine Control Flags',
+        desc: 'A 16-bit register where 9 individual flip-flops are implemented in the 8086. Six Status Flags reflect the mathematical outcome of the last ALU operation, while three Control Flags govern CPU operating behavior.',
+        bullets: [
+          '6 Status Flags: Carry (CF), Parity (PF), Auxiliary Carry (AF), Zero (ZF), Sign (SF), Overflow (OF).',
+          '3 Control Flags: Trap/Single-Step (TF), Interrupt Enable (IF), String Direction (DF).',
+          'Scroll down to Section 3 to toggle and inspect every bit from D15 to D0!'
+        ]
+      },
+      EU_CONTROL: {
+        unit: 'EXECUTION UNIT (EU)',
+        unitType: 'eu',
+        width: 'Microprogrammed Control & Decoder',
+        title: 'EU Control System & Instruction Decoder',
+        subtitle: 'Fetches Bytes from Queue, Decodes Opcode & Drives Internal Timing',
+        desc: 'Fetches prefetched instruction object-code bytes one by one from the 6-Byte Instruction Queue via the Q-Bus, translates them in the Instruction Decoder, and emits internal micro-control signals to the ALU and registers.',
+        bullets: [
+          'Operates asynchronously from the external system bus thanks to the 6-Byte Instruction Queue.',
+          'If an instruction needs data from memory or I/O, the EU Control System requests the BIU to perform a bus cycle.'
+        ]
+      },
+      INST_QUEUE: {
+        unit: 'BUS INTERFACE UNIT (BIU)',
+        unitType: 'shared',
+        width: '6-Byte First-In-First-Out (FIFO) Buffer',
+        title: '6-Byte Instruction Prefetch Queue',
+        subtitle: 'Hardware Pipelining Bridge Between BIU and EU',
+        desc: 'While the Execution Unit (EU) is busy decoding and executing the current instruction, the Bus Interface Unit (BIU) prefetches up to 6 bytes of upcoming instruction code from CS:IP and stores them in this FIFO register queue.',
+        bullets: [
+          'Why 6 Bytes? The longest 8086 machine instruction is 6 bytes long.',
+          'Refill Rule: In the 8086 (16-bit data bus), the BIU initiates a 2-byte instruction fetch cycle whenever at least 2 bytes in the queue become empty (unlike the 8088 which has a 4-byte queue and fetches 1 byte at a time).',
+          'Pipeline Hazard: On a JMP, CALL, RET, or taken Conditional Branch, the queue is flushed (emptied) and reloaded from the new target CS:IP.'
+        ]
+      },
+      ADDR_ADDER: {
+        unit: 'BUS INTERFACE UNIT (BIU)',
+        unitType: 'biu',
+        width: '20-Bit Dedicated Adder (Σ)',
+        title: '20-Bit Physical Address Adder (Σ)',
+        subtitle: 'Computes 20-Bit Physical Address from 16-Bit Segment & Offset',
+        desc: 'A dedicated hardware summer inside the BIU (distinct from the EU ALU) that combines a 16-bit Segment Register and a 16-bit Offset to produce a 20-bit physical memory address (00000H to FFFFFH).',
+        bullets: [
+          'Hardware Formula: Physical Address = (Segment Register × 10H) + Effective Offset Address.',
+          'Shifting the 16-bit Segment Register left by 4 binary bits appends one hexadecimal zero (0H) to its right.',
+          'Enables addressing 2²⁰ = 1,048,576 bytes (1 MB) of external memory using 16-bit registers.'
+        ]
+      },
+      BUS_CONTROL: {
+        unit: 'BUS INTERFACE UNIT (BIU)',
+        unitType: 'biu',
+        width: 'External Bus State Machine',
+        title: 'External Bus Control Logic',
+        subtitle: 'Manages T1–T4 Bus Timing, Address Latching & Read/Write Strobes',
+        desc: 'Coordinates all external memory and I/O read/write bus cycles. Drives the time-multiplexed Address/Data bus (AD0–AD15) and upper status/address lines (A16/S3–A19/S6).',
+        bullets: [
+          'A standard 8086 bus cycle consists of 4 T-states (T1, T2, T3, T4), with optional Wait states (Tw) for slow memory.',
+          'During T1, outputs the 20-bit address and pulses ALE (Address Latch Enable) to external 8282/74LS373 latches.',
+          'During T2–T4, switches AD0–AD15 to transfer 16-bit data using RD̅, WR̅, and BHE̅ (Bus High Enable).'
+        ]
+      },
+      REG_CS: {
+        unit: 'BUS INTERFACE UNIT (BIU)',
+        unitType: 'biu',
+        width: '16-Bit Segment Register',
+        title: 'CS — Code Segment Register',
+        subtitle: 'Holds Base Address of the Active 64 KB Program Code Segment',
+        desc: 'CS defines the starting base paragraph of the 64 KB memory segment containing the currently executing machine instructions. Always paired with the Instruction Pointer (CS:IP).',
+        bullets: [
+          'Physical Address of next instruction fetched = (CS × 10H) + IP.',
+          'Cannot be modified directly via MOV CS, AX (doing so would cause an uncontrolled jump); only altered via FAR JMP, FAR CALL, INT, or IRET.'
+        ]
+      },
+      REG_DS: {
+        unit: 'BUS INTERFACE UNIT (BIU)',
+        unitType: 'biu',
+        width: '16-Bit Segment Register',
+        title: 'DS — Data Segment Register',
+        subtitle: 'Holds Base Address of the Default 64 KB Data Segment',
+        desc: 'DS points to the base of the current 64 KB Data Segment where most program variables, arrays, and lookup tables reside.',
+        bullets: [
+          'Paired by default with BX, SI, DI, or direct 16-bit displacement offsets: PA = (DS × 10H) + Effective Address.',
+          'Can be overridden for a single instruction using a Segment Override Prefix (e.g., MOV AX, ES:[BX]).'
+        ]
+      },
+      REG_SS: {
+        unit: 'BUS INTERFACE UNIT (BIU)',
+        unitType: 'biu',
+        width: '16-Bit Segment Register',
+        title: 'SS — Stack Segment Register',
+        subtitle: 'Holds Base Address of the 64 KB LIFO Stack Segment',
+        desc: 'SS defines the 64 KB memory segment used for the hardware stack (subroutine return addresses, saved registers, and local stack frames).',
+        bullets: [
+          'Paired by default with SP (Stack Pointer) and BP (Base Pointer): PA = (SS × 10H) + SP or BP.',
+          'Loading SS with a MOV or POP instruction automatically inhibits hardware interrupts for the very next instruction so SP can be updated safely!'
+        ]
+      },
+      REG_ES: {
+        unit: 'BUS INTERFACE UNIT (BIU)',
+        unitType: 'biu',
+        width: '16-Bit Segment Register',
+        title: 'ES — Extra Segment Register',
+        subtitle: 'Additional 64 KB Data Segment for String Destinations & Large Data',
+        desc: 'ES is an auxiliary 64 KB data segment register used by string instructions as the mandatory destination segment and available via segment override prefixes for general data.',
+        bullets: [
+          'String instructions (MOVSB/W, STOSB/W, CMPSB/W, SCASB/W) always use ES:DI as the destination address.',
+          'Allows a single string instruction (MOVSW) to copy memory directly between two distinct 64 KB segments (DS:SI → ES:DI).'
+        ]
+      },
+      REG_IP: {
+        unit: 'BUS INTERFACE UNIT (BIU)',
+        unitType: 'biu',
+        width: '16-Bit Offset Register',
+        title: 'IP — Instruction Pointer',
+        subtitle: 'Offset Address of the Next Instruction Byte to Prefetch in CS',
+        desc: 'IP holds the 16-bit offset within the Code Segment (CS) of the next instruction byte to be prefetched by the BIU into the 6-Byte Instruction Queue.',
+        bullets: [
+          'Important Distinction: IP points to the next byte to be prefetched by the BIU, NOT the instruction currently executing in the EU!',
+          'Automatically incremented by the BIU each time instruction bytes are fetched from memory into the queue.'
+        ]
+      },
+      COMM_REGS: {
+        unit: 'BUS INTERFACE UNIT (BIU)',
+        unitType: 'biu',
+        width: '16-Bit Internal Latches',
+        title: 'Internal Communication Registers',
+        subtitle: 'Bridges EU Internal Bus and BIU Segment/Address Bus',
+        desc: 'Internal holding registers inside the BIU that buffer 16-bit data words and offset addresses passing between the Execution Unit and the Bus Interface Unit.',
+        bullets: [
+          'Transfers effective offset addresses (BX, SI, DI, BP, SP) from EU to the 20-Bit Physical Address Adder.',
+          'Buffers 16-bit memory read/write operands between external memory cycles and EU registers.'
+        ]
+      },
+      EXTERNAL_BUS: {
+        unit: 'SYSTEM INTERFACE',
+        unitType: 'shared',
+        width: '20-Bit Address / 16-Bit Data Bus',
+        title: 'External 20-Bit Address & 16-Bit Data System Bus',
+        subtitle: 'Multiplexed AD0–AD15 & A16/S3–A19/S6 Pin Interface',
+        desc: 'Connects the 8086 BIU to external ROM/RAM memory banks (organized as Even/Low and Odd/High 512 KB banks) and external I/O peripherals.',
+        bullets: [
+          '20 Address Lines (A0–A19) address 2²⁰ = 1,048,576 bytes (1 MB) from 00000H to FFFFFH.',
+          '16 Data Lines (D0–D15) allow transferring a full 16-bit word in one bus cycle if aligned on an even address (A0=0, BHE̅=0).'
+        ]
+      }
+    };
+
+    // 2. LIVE SIMULATOR STATE
+    let cpuState = {
+      AX: 0x2410,
+      BX: 0x0150,
+      CX: 0x0008,
+      DX: 0x03F8,
+      SP: 0xFFFE,
+      BP: 0x0200,
+      SI: 0x0400,
+      DI: 0x0500,
+      ES: 0x4000,
+      CS: 0x2000,
+      SS: 0x5000,
+      DS: 0x3000,
+      IP: 0x0104,
+      queue: [
+        { byte: '8BH', desc: 'MOV r16,r/m' },
+        { byte: '04H', desc: 'AX, [SI]' },
+        { byte: '03H', desc: 'ADD Opcode' },
+        { byte: 'C3H', desc: 'AX, BX' }
+      ],
+      flags: {
+        15: 0, 14: 0, 13: 0, 12: 0,
+        11: 0, // OF
+        10: 0, // DF
+        9: 1,  // IF
+        8: 0,  // TF
+        7: 0,  // SF
+        6: 0,  // ZF
+        5: 0,
+        4: 0,  // AF
+        3: 0,
+        2: 0,  // PF
+        1: 1,  // Reserved (1 on 8086)
+        0: 0   // CF
+      }
+    };
+
+    const OPCODE_POOL = [
+      { b1: '89H', b2: 'D8H', asm: 'MOV AX, BX' },
+      { b1: '01H', b2: 'D8H', asm: 'ADD AX, BX' },
+      { b1: '29H', b2: 'D8H', asm: 'SUB AX, BX' },
+      { b1: '41H', b2: '90H', asm: 'INC CX / NOP' },
+      { b1: '31H', b2: 'D2H', asm: 'XOR DX, DX' },
+      { b1: '8BH', b2: '36H', asm: 'MOV SI, [0400H]' }
+    ];
+    let poolIndex = 0;
+    let autoPipelineInterval = null;
+    let selectedBlockId = 'REG_AX';
+    let selectedFlagBit = 0; // Default CF (Bit D0)
+
+    // Helper: Format Hex
+    function toHex(val, digits = 4) {
+      return (val >>> 0).toString(16).toUpperCase().padStart(digits, '0') + 'H';
+    }
+
+    // Render CPU State to DOM
+    function renderCpuState() {
+      // General Purpose Registers (16-bit & 8-bit High/Low)
+      ['AX', 'BX', 'CX', 'DX'].forEach(reg => {
+        const val = cpuState[reg] & 0xFFFF;
+        const high = (val >> 8) & 0xFF;
+        const low = val & 0xFF;
+        const prefix = reg[0];
+        document.getElementById(`val-${reg}`).textContent = toHex(val, 4);
+        document.getElementById(`val-${prefix}H`).textContent = toHex(high, 2);
+        document.getElementById(`val-${prefix}L`).textContent = toHex(low, 2);
+      });
+
+      // Pointers, Index & Segments
+      ['SP', 'BP', 'SI', 'DI', 'ES', 'CS', 'SS', 'DS', 'IP'].forEach(reg => {
+        const el = document.getElementById(`val-${reg}`);
+        if (el) el.textContent = toHex(cpuState[reg] & 0xFFFF, 4);
+      });
+
+      // Live Physical Address on Diagram
+      const csVal = cpuState.CS & 0xFFFF;
+      const ipVal = cpuState.IP & 0xFFFF;
+      const pa = ((csVal << 4) + ipVal) & 0xFFFFF;
+      document.getElementById('diagram-live-pa').textContent =
+        `CS:IP = ${toHex(csVal << 4, 5)} + ${toHex(ipVal, 4)} = ${toHex(pa, 5)}`;
+
+      // Render 6-Byte FIFO Instruction Queue
+      const qContainer = document.getElementById('queue-slots-container');
+      qContainer.innerHTML = '';
+      for (let i = 0; i < 6; i++) {
+        const item = cpuState.queue[i];
+        const isFilled = Boolean(item);
+        const slotDiv = document.createElement('div');
+        slotDiv.className = `rounded-lg p-1.5 border transition-all ${
+          isFilled
+            ? i === 0
+              ? 'bg-amber-500/25 border-amber-400 text-amber-200 shadow-sm'
+              : 'bg-blue-950/80 border-blue-500/50 text-blue-200'
+            : 'bg-slate-950/60 border-slate-800 text-slate-600'
+        }`;
+        slotDiv.innerHTML = `
+          <div class="text-[9px] uppercase ${i === 0 ? 'text-amber-300 font-bold' : 'text-slate-400'}">
+            ${i === 0 ? 'HEAD (1)' : `Slot ${i + 1}`}
+          </div>
+          <div class="text-xs font-bold mt-0.5">${isFilled ? item.byte : '--'}</div>
+          <div class="text-[9px] truncate opacity-80">${isFilled ? item.desc : 'Empty'}</div>
+        `;
+        qContainer.appendChild(slotDiv);
+      }
+      document.getElementById('queue-count-badge').textContent = `${cpuState.queue.length} / 6 Bytes`;
+
+      // Update Mini Flag Strip & 16-bit Flag Hex
+      const flagMap = { OF: 11, DF: 10, IF: 9, TF: 8, SF: 7, ZF: 6, AF: 4, PF: 2, CF: 0 };
+      Object.entries(flagMap).forEach(([name, bit]) => {
+        const el = document.getElementById(`mini-flag-${name}`);
+        if (el) {
+          el.textContent = cpuState.flags[bit];
+          el.className = cpuState.flags[bit]
+            ? 'font-bold text-amber-300'
+            : 'font-bold text-slate-500';
+        }
+      });
+
+      let flagWord = 0;
+      for (let b = 0; b < 16; b++) {
+        if (cpuState.flags[b]) flagWord |= (1 << b);
+      }
+      document.getElementById('val-FLAGS-HEX').textContent = toHex(flagWord, 4);
+      document.getElementById('flag-total-hex').textContent = toHex(flagWord, 4);
+    }
+
+    // 3. BLOCK SELECTION & SPECIFICATION INSPECTOR
+    function selectBlock(blockId) {
+      selectedBlockId = blockId;
+      const spec = ARCH_SPECS[blockId];
+      if (!spec) return;
+
+      // Remove active highlights from all blocks
+      document.querySelectorAll('.arch-block').forEach(el => {
+        el.classList.remove('selected-eu', 'selected-biu', 'selected-shared');
+      });
+
+      // Highlight selected block
+      const targetEl = document.getElementById(`block-${blockId}`);
+      if (targetEl) {
+        const highlightClass =
+          spec.unitType === 'eu' ? 'selected-eu' :
+          spec.unitType === 'biu' ? 'selected-biu' : 'selected-shared';
+        targetEl.classList.add(highlightClass);
+      }
+
+      // Update Inspector Panel
+      const unitPill = document.getElementById('inspector-unit-pill');
+      unitPill.textContent = spec.unit;
+      unitPill.className = `px-2.5 py-0.5 rounded-full text-xs font-mono font-bold border ${
+        spec.unitType === 'eu'
+          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+          : spec.unitType === 'biu'
+          ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+          : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+      }`;
+
+      document.getElementById('inspector-width-pill').textContent = spec.width;
+      document.getElementById('inspector-title').textContent = spec.title;
+      document.getElementById('inspector-subtitle').textContent = spec.subtitle;
+      document.getElementById('inspector-desc').textContent = spec.desc;
+
+      const bulletsEl = document.getElementById('inspector-bullets');
+      bulletsEl.innerHTML = spec.bullets
+        .map(b => `<li class="leading-relaxed">${b}</li>`)
+        .join('');
+    }
+
+    // 4. PIPELINING & EXECUTION SIMULATOR FUNCTIONS
+    function appendTraceLog(tag, msg, colorClass = 'text-slate-300') {
+      const container = document.getElementById('trace-log-container');
+      const entry = document.createElement('div');
+      const time = new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' });
+      entry.className = `flex items-start gap-2 border-b border-slate-900 pb-1 ${colorClass}`;
+      entry.innerHTML = `
+        <span class="text-slate-600 shrink-0">[${time}]</span>
+        <span class="font-bold shrink-0">[${tag}]</span>
+        <span>${msg}</span>
+      `;
+      container.prepend(entry);
+    }
+
+    function clearTraceLog() {
+      document.getElementById('trace-log-container').innerHTML = '';
+      appendTraceLog('SYS', 'Trace log cleared. Ready for cycle simulation.', 'text-slate-400');
+    }
+
+    function flashConduit(id, dirClass = 'flow-down') {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add(dirClass);
+      setTimeout(() => el.classList.remove(dirClass), 850);
+    }
+
+    // Action 1: BIU Prefetch 2 Bytes into Queue
+    function simPrefetchByte() {
+      if (cpuState.queue.length >= 5) {
+        // If 5 or 6 bytes full, 8086 BIU waits until at least 2 bytes are empty
+        const msg = `Queue has ${cpuState.queue.length}/6 bytes. 8086 BIU waits until ≥ 2 bytes are empty before initiating a 16-bit word fetch!`;
+        document.getElementById('sim-status-badge').textContent = 'QUEUE FULL (BIU IDLE)';
+        document.getElementById('sim-live-narration').textContent = msg;
+        appendTraceLog('BIU', msg, 'text-amber-300');
+        selectBlock('INST_QUEUE');
+        return;
+      }
+
+      const pair = OPCODE_POOL[poolIndex % OPCODE_POOL.length];
+      poolIndex++;
+
+      const fetchPA = ((cpuState.CS << 4) + cpuState.IP) & 0xFFFFF;
+      cpuState.queue.push({ byte: pair.b1, desc: pair.asm });
+      cpuState.queue.push({ byte: pair.b2, desc: pair.asm });
+      cpuState.IP = (cpuState.IP + 2) & 0xFFFF;
+
+      flashConduit('conduit-ext-addr', 'flow-up');
+      flashConduit('conduit-ext-data', 'flow-down');
+
+      const msg = `Fetched 16-bit word (${pair.b1} ${pair.b2}) from Physical Addr ${toHex(fetchPA, 5)} into FIFO Queue. IP incremented by 2 → ${toHex(cpuState.IP, 4)}.`;
+      document.getElementById('sim-status-badge').textContent = 'BIU PREFETCH CYCLE';
+      document.getElementById('sim-live-narration').textContent = msg;
+      appendTraceLog('BIU', msg, 'text-blue-400');
+
+      renderCpuState();
+      selectBlock('INST_QUEUE');
+    }
+
+    // Action 2: EU Decode & Execute from Queue
+    function simExecuteInstruction() {
+      if (cpuState.queue.length === 0) {
+        const msg = 'Instruction Queue is EMPTY! EU must wait for BIU to prefetch instruction bytes from CS:IP.';
+        document.getElementById('sim-status-badge').textContent = 'EU STALLED (QUEUE EMPTY)';
+        document.getElementById('sim-live-narration').textContent = msg;
+        appendTraceLog('EU', msg, 'text-rose-400');
+        selectBlock('EU_CONTROL');
+        return;
+      }
+
+      const popped1 = cpuState.queue.shift();
+      const popped2 = cpuState.queue.length > 0 ? cpuState.queue.shift() : null;
+
+      // Simulate register modification
+      cpuState.AX = (cpuState.AX + 0x0102) & 0xFFFF;
+      cpuState.CX = cpuState.CX > 0 ? cpuState.CX - 1 : 0x0008;
+      cpuState.flags[6] = cpuState.AX === 0 ? 1 : 0; // ZF
+
+      const instrDesc = popped2 ? `${popped1.byte} ${popped2.byte} (${popped1.desc})` : `${popped1.byte} (${popped1.desc})`;
+      document.getElementById('eu-decoder-status').textContent =
+        `Decoded & Executed: ${instrDesc} | AX=${toHex(cpuState.AX, 4)}`;
+
+      const msg = `EU popped [${instrDesc}] from Queue Head, decoded & executed via ALU. Queue now has ${cpuState.queue.length}/6 bytes.`;
+      document.getElementById('sim-status-badge').textContent = 'EU DECODE & EXECUTE';
+      document.getElementById('sim-live-narration').textContent = msg;
+      appendTraceLog('EU', msg, 'text-emerald-400');
+
+      renderCpuState();
+      selectBlock('EU_CONTROL');
+    }
+
+    // Action 3: ALU Operation (ADD AX, BX)
+    function simAluOperation() {
+      const oldAX = cpuState.AX;
+      const bx = cpuState.BX;
+      const sum = oldAX + bx;
+      const res16 = sum & 0xFFFF;
+
+      // Update Temp Reg Display
+      document.getElementById('val-TEMP1').textContent = toHex(oldAX, 4);
+      document.getElementById('val-TEMP2').textContent = toHex(bx, 4);
+      document.getElementById('alu-op-display').textContent =
+        `EXECUTING: ${toHex(oldAX, 4)} + ${toHex(bx, 4)} = ${toHex(res16, 4)}`;
+
+      cpuState.AX = res16;
+      // Compute realistic flags
+      cpuState.flags[0] = sum > 0xFFFF ? 1 : 0; // CF
+      cpuState.flags[6] = res16 === 0 ? 1 : 0;  // ZF
+      cpuState.flags[7] = (res16 & 0x8000) ? 1 : 0; // SF
+      cpuState.flags[4] = ((oldAX & 0xF) + (bx & 0xF)) > 0xF ? 1 : 0; // AF
+
+      const msg = `16-Bit ALU executed ADD AX, BX (${toHex(oldAX, 4)} + ${toHex(bx, 4)} = ${toHex(res16, 4)}). Updated Status Flags (CF=${cpuState.flags[0]}, ZF=${cpuState.flags[6]}, SF=${cpuState.flags[7]}).`;
+      document.getElementById('sim-status-badge').textContent = 'ALU ARITHMETIC OP';
+      document.getElementById('sim-live-narration').textContent = msg;
+      appendTraceLog('ALU', msg, 'text-purple-400');
+
+      renderCpuState();
+      renderFlagGrid();
+      selectBlock('ALU');
+    }
+
+    // Action 4: Branch / JMP Instruction (Flush Pipeline Queue)
+    function simBranchFlush() {
+      const flushedCount = cpuState.queue.length;
+      cpuState.queue = [];
+      cpuState.IP = 0x0400; // New jump target offset
+
+      document.getElementById('eu-decoder-status').textContent =
+        `EXECUTED: JMP 0400H → Pipeline Queue Flushed!`;
+
+      const msg = `JMP 0400H executed! All ${flushedCount} prefetched bytes in the 6-Byte Instruction Queue were FLUSHED (discarded) and IP reloaded with 0400H.`;
+      document.getElementById('sim-status-badge').textContent = 'BRANCH HAZARD: QUEUE FLUSHED';
+      document.getElementById('sim-live-narration').textContent = msg;
+      appendTraceLog('HAZARD', msg, 'text-rose-400');
+
+      renderCpuState();
+      selectBlock('INST_QUEUE');
+    }
+
+    // Action 5: Toggle Continuous Auto-Pipeline
+    function toggleAutoPipeline() {
+      const btnText = document.getElementById('auto-sim-text');
+      const btnIcon = document.getElementById('auto-sim-icon');
+      if (autoPipelineInterval) {
+        clearInterval(autoPipelineInterval);
+        autoPipelineInterval = null;
+        btnText.textContent = 'Auto Pipeline';
+        btnIcon.textContent = '▶';
+        return;
+      }
+
+      btnText.textContent = 'Stop Auto';
+      btnIcon.textContent = '⏸';
+      let step = 0;
+      autoPipelineInterval = setInterval(() => {
+        if (cpuState.queue.length <= 2) {
+          simPrefetchByte();
+        } else if (step % 2 === 0) {
+          simExecuteInstruction();
+        } else {
+          simAluOperation();
+        }
+        step++;
+      }, 1600);
+    }
+
+    function resetArchitectureState() {
+      if (autoPipelineInterval) toggleAutoPipeline();
+      cpuState.AX = 0x2410;
+      cpuState.BX = 0x0150;
+      cpuState.CX = 0x0008;
+      cpuState.DX = 0x03F8;
+      cpuState.IP = 0x0104;
+      cpuState.queue = [
+        { byte: '8BH', desc: 'MOV r16,r/m' },
+        { byte: '04H', desc: 'AX, [SI]' },
+        { byte: '03H', desc: 'ADD Opcode' },
+        { byte: 'C3H', desc: 'AX, BX' }
+      ];
+      applyFlagPreset('CLEAR');
+      renderCpuState();
+      selectBlock('REG_AX');
+      appendTraceLog('RESET', 'All 8086 registers, flags, and instruction queue restored to initial state.', 'text-amber-300');
+    }
+
+    // 5. 20-BIT PHYSICAL ADDRESS CALCULATOR LOGIC
+    function sanitizeHexInput(str) {
+      return str.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+    }
+
+    function toBinGrouped(num, bits) {
+      const bin = (num >>> 0).toString(2).padStart(bits, '0');
+      return bin.match(/.{1,4}/g).join(' ');
+    }
+
+    function setAddressPreset(segName, offName, segHex, offHex) {
+      document.getElementById('calc-seg-select').value = segName;
+      document.getElementById('calc-off-select').value = offName;
+      document.getElementById('calc-seg-input').value = segHex;
+      document.getElementById('calc-off-input').value = offHex;
+      updatePhysicalAddressCalc();
+    }
+
+    function updatePhysicalAddressCalc() {
+      const segInput = document.getElementById('calc-seg-input');
+      const offInput = document.getElementById('calc-off-input');
+      const segName = document.getElementById('calc-seg-select').value;
+      const offName = document.getElementById('calc-off-select').value;
+
+      const cleanSeg = sanitizeHexInput(segInput.value) || '0';
+      const cleanOff = sanitizeHexInput(offInput.value) || '0';
+      segInput.value = cleanSeg;
+      offInput.value = cleanOff;
+
+      const segVal = parseInt(cleanSeg, 16) & 0xFFFF;
+      const offVal = parseInt(cleanOff, 16) & 0xFFFF;
+
+      const shiftedSeg = segVal * 16; // × 10H (20-bit)
+      const rawPA = shiftedSeg + offVal;
+      const wrappedPA = rawPA & 0xFFFFF; // 20-bit mask
+      const isOverflow = rawPA > 0xFFFFF;
+
+      // Update Logical Address & Overflow Warning
+      document.getElementById('calc-logical-str').textContent =
+        `${segName}:${offName} = ${cleanSeg.padStart(4, '0')}H : ${cleanOff.padStart(4, '0')}H`;
+
+      const wrapBadge = document.getElementById('calc-wraparound-badge');
+      if (isOverflow) {
+        wrapBadge.classList.remove('hidden');
+      } else {
+        wrapBadge.classList.add('hidden');
+      }
+
+      // Binary & Hex Breakdown
+      document.getElementById('calc-bin-seg').innerHTML =
+        `${toBinGrouped(segVal, 16)} <span class="text-amber-400 font-bold">0000</span>₂`;
+      document.getElementById('calc-hex-shifted').textContent = toHex(shiftedSeg, 5);
+
+      document.getElementById('calc-bin-off').textContent = `0000 ${toBinGrouped(offVal, 16)}₂`;
+      document.getElementById('calc-hex-offset').textContent = `+ ${toHex(offVal, 5)}`;
+
+      document.getElementById('calc-bin-pa').textContent = `${toBinGrouped(wrappedPA, 20)}₂`;
+      document.getElementById('calc-hex-pa').textContent = toHex(wrappedPA, 5);
+
+      const segEnd = (shiftedSeg + 0xFFFF) & 0xFFFFF;
+      document.getElementById('calc-segment-range').textContent =
+        `Active 64 KB Segment Range: ${toHex(shiftedSeg, 5)} – ${toHex(segEnd, 5)}`;
+
+      // Sync with CPU State & Diagram
+      cpuState[segName] = segVal;
+      if (cpuState[offName] !== undefined) cpuState[offName] = offVal;
+      renderCpuState();
+    }
+
+    // 6. 16-BIT FLAG REGISTER EXPLORER DATABASE & LOGIC
+    const FLAG_BITS_META = {
+      15: { symbol: 'U', name: 'Unused / Reserved Bit D15', type: 'Reserved', desc: 'Unimplemented in the Intel 8086 (hardwired to 0). Used in later 80286/80386 processors.', asm: 'N/A (Always reads 0 in 8086)' },
+      14: { symbol: 'U', name: 'Unused / Reserved Bit D14', type: 'Reserved', desc: 'Unimplemented in 8086. Later became Nested Task (NT) flag in 80286 Protected Mode.', asm: 'N/A' },
+      13: { symbol: 'U', name: 'Unused / Reserved Bit D13', type: 'Reserved', desc: 'Unimplemented in 8086. Later became IOPL (I/O Privilege Level) bit in 80286.', asm: 'N/A' },
+      12: { symbol: 'U', name: 'Unused / Reserved Bit D12', type: 'Reserved', desc: 'Unimplemented in 8086. Later became IOPL bit in 80286.', asm: 'N/A' },
+      11: {
+        symbol: 'OF',
+        name: 'OF — Overflow Flag (Bit D11)',
+        type: 'Status Flag',
+        desc: 'Set to 1 if the signed result of a two’s-complement arithmetic operation is too large or too small to fit in the destination (i.e., Carry into MSB ⊕ Carry out of MSB = 1).',
+        asm: 'JO (Jump if Overflow), JNO (Jump if No Overflow), INTO (Interrupt 4 on Overflow)'
+      },
+      10: {
+        symbol: 'DF',
+        name: 'DF — Direction Flag (Bit D10)',
+        type: 'Control Flag',
+        desc: 'Controls string instruction pointer direction: DF = 0 auto-increments SI/DI (low to high memory); DF = 1 auto-decrements SI/DI (high to low memory).',
+        asm: 'CLD (Clear Direction Flag → DF=0), STD (Set Direction Flag → DF=1)'
+      },
+      9: {
+        symbol: 'IF',
+        name: 'IF — Interrupt Enable Flag (Bit D9)',
+        type: 'Control Flag',
+        desc: 'When IF = 1, the 8086 CPU recognizes external maskable hardware interrupts on the INTR pin. When IF = 0, INTR interrupts are ignored (NMI remains active).',
+        asm: 'STI (Set Interrupt Flag → IF=1), CLI (Clear Interrupt Flag → IF=0)'
+      },
+      8: {
+        symbol: 'TF',
+        name: 'TF — Trap Flag / Single-Step Flag (Bit D8)',
+        type: 'Control Flag',
+        desc: 'When TF = 1, the 8086 enters Single-Step Debugging Mode, automatically generating a Type 1 internal interrupt after executing each instruction.',
+        asm: 'Modified via PUSHF → POP AX → OR AX, 0100H → PUSH AX → POPF'
+      },
+      7: {
+        symbol: 'SF',
+        name: 'SF — Sign Flag (Bit D7)',
+        type: 'Status Flag',
+        desc: 'Mirrors the Most Significant Bit (MSB: D7 for byte, D15 for word) of the result. SF = 1 indicates a negative signed result; SF = 0 indicates a positive result.',
+        asm: 'JS (Jump if Sign / Negative), JNS (Jump if Not Sign / Positive)'
+      },
+      6: {
+        symbol: 'ZF',
+        name: 'ZF — Zero Flag (Bit D6)',
+        type: 'Status Flag',
+        desc: 'Set to 1 if the result of an arithmetic or logic operation is identically zero (all bits 0). Cleared to 0 if the result is non-zero.',
+        asm: 'JZ / JE (Jump if Zero / Equal), JNZ / JNE (Jump if Not Zero), LOOPE, REPZ'
+      },
+      5: { symbol: 'U', name: 'Unused / Reserved Bit D5', type: 'Reserved', desc: 'Unimplemented bit in the 8086 Flag Register (always 0).', asm: 'N/A' },
+      4: {
+        symbol: 'AF',
+        name: 'AF — Auxiliary Carry Flag (Bit D4)',
+        type: 'Status Flag',
+        desc: 'Set to 1 if there is an unsigned carry out of bit D3 into bit D4 (lower nibble to upper nibble) or borrow from D4 to D3. Used exclusively for BCD arithmetic.',
+        asm: 'Used implicitly by DAA (Decimal Adjust after Addition), DAS, AAA, AAS'
+      },
+      3: { symbol: 'U', name: 'Unused / Reserved Bit D3', type: 'Reserved', desc: 'Unimplemented bit in the 8086 Flag Register (always 0).', asm: 'N/A' },
+      2: {
+        symbol: 'PF',
+        name: 'PF — Parity Flag (Bit D2)',
+        type: 'Status Flag',
+        desc: 'Set to 1 if the lower 8 bits (low byte) of the result contain an EVEN number of 1-bits (Even Parity). Cleared to 0 if the number of 1-bits is odd.',
+        asm: 'JP / JPE (Jump if Parity Even), JNP / JPO (Jump if Parity Odd)'
+      },
+      1: { symbol: 'U', name: 'Unused / Reserved Bit D1', type: 'Reserved', desc: 'Reserved bit in 8086 (traditionally hardwired to 1 in Intel x86 architecture).', asm: 'N/A' },
+      0: {
+        symbol: 'CF',
+        name: 'CF — Carry Flag (Bit D0)',
+        type: 'Status Flag',
+        desc: 'Set to 1 if an unsigned arithmetic operation generates a carry out of or a borrow into the Most Significant Bit (D7 or D15). Also holds the last bit shifted out.',
+        asm: 'JC / JB (Jump if Carry / Below), JNC (Jump if No Carry), STC, CLC, CMC, ADC, SBB'
+      }
+    };
+
+    function renderFlagGrid() {
+      const grid = document.getElementById('flag-16bit-grid');
+      grid.innerHTML = '';
+
+      for (let bit = 15; bit >= 0; bit--) {
+        const meta = FLAG_BITS_META[bit];
+        const val = cpuState.flags[bit];
+        const isSelected = selectedFlagBit === bit;
+
+        let colorClasses = 'bg-slate-950/70 border-slate-800 text-slate-500';
+        if (meta.type === 'Status Flag') {
+          colorClasses = val
+            ? 'bg-emerald-500/25 border-emerald-400 text-emerald-200'
+            : 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300';
+        } else if (meta.type === 'Control Flag') {
+          colorClasses = val
+            ? 'bg-purple-500/25 border-purple-400 text-purple-200'
+            : 'bg-purple-950/30 border-purple-500/40 text-purple-300';
+        }
+
+        const cell = document.createElement('div');
+        cell.onclick = () => selectAndToggleFlagBit(bit);
+        cell.className = `cursor-pointer rounded-xl p-2 border-2 transition-all hover:-translate-y-0.5 ${colorClasses} ${
+          isSelected ? 'ring-2 ring-amber-400 shadow-lg shadow-amber-500/20' : ''
+        }`;
+        cell.innerHTML = `
+          <div class="text-[10px] text-slate-400">D${bit}</div>
+          <div class="text-xs font-extrabold my-1">${meta.symbol}</div>
+          <div class="text-sm font-bold px-1.5 py-0.5 rounded bg-slate-950/80 ${
+            val ? 'text-amber-300' : 'text-slate-400'
+          }">${val}</div>
+        `;
+        grid.appendChild(cell);
+      }
+
+      // Update detail card for currently selected bit
+      const selMeta = FLAG_BITS_META[selectedFlagBit];
+      const badgeEl = document.getElementById('flag-detail-badge');
+      badgeEl.textContent = `Bit D${selectedFlagBit} — ${selMeta.type}`;
+      badgeEl.className = `px-2.5 py-0.5 rounded text-xs font-mono font-bold border ${
+        selMeta.type === 'Status Flag'
+          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+          : selMeta.type === 'Control Flag'
+          ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+          : 'bg-slate-800 text-slate-400 border-slate-700'
+      }`;
+
+      document.getElementById('flag-detail-title').textContent =
+        `${selMeta.name} = ${cpuState.flags[selectedFlagBit]}`;
+      document.getElementById('flag-detail-desc').textContent = selMeta.desc;
+      document.getElementById('flag-detail-asm').textContent = `Related Assembly Instructions: ${selMeta.asm}`;
+    }
+
+    function selectAndToggleFlagBit(bit) {
+      if (selectedFlagBit === bit) {
+        cpuState.flags[bit] = cpuState.flags[bit] ? 0 : 1;
+      } else {
+        selectedFlagBit = bit;
+      }
+      renderCpuState();
+      renderFlagGrid();
+    }
+
+    function toggleSelectedFlagBit() {
+      cpuState.flags[selectedFlagBit] = cpuState.flags[selectedFlagBit] ? 0 : 1;
+      renderCpuState();
+      renderFlagGrid();
+    }
+
+    function applyFlagPreset(preset) {
+      Object.keys(cpuState.flags).forEach(k => (cpuState.flags[k] = 0));
+      cpuState.flags[1] = 1; // Reserved bit 1
+      cpuState.flags[9] = 1; // IF enabled by default
+
+      if (preset === 'ZERO') {
+        cpuState.flags[6] = 1; // ZF = 1
+        cpuState.flags[2] = 1; // PF = 1
+        selectedFlagBit = 6;
+      } else if (preset === 'OVERFLOW') {
+        cpuState.flags[11] = 1; // OF = 1
+        cpuState.flags[7] = 1;  // SF = 1
+        selectedFlagBit = 11;
+      } else if (preset === 'STRING_DEC') {
+        cpuState.flags[10] = 1; // DF = 1
+        selectedFlagBit = 10;
+      }
+      renderCpuState();
+      renderFlagGrid();
+    }
+
+    // INITIALIZE PAGE ON LOAD
+    window.onload = function () {
+      renderCpuState();
+      selectBlock('REG_AX');
+      updatePhysicalAddressCalc();
+      renderFlagGrid();
+      appendTraceLog('INIT', 'Intel 8086 Architecture initialized. Click any block or run a bus cycle.', 'text-emerald-400');
+    };
+  </script>
+</body>
+</html>
